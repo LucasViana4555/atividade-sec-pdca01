@@ -1,0 +1,151 @@
+Nome: Lucas Viana da Silva, Ryan Costa Ribeiro, Miguel Faria
+Atividade01 - Segurança
+Dia: 26/08/2025
+
+### Tabela de Análise de Riscos
+
+| ID  | Vulnerabilidade                                | Probabilidade | Impacto | Risco (P x I) | Nível de Risco |
+| :-- | :--------------------------------------------- | :-----------: | :-----: | :-----------: | :------------- |
+| V01 | Credenciais em Texto Claro no Código          |       5       |    5    |      25       | **Crítico** |
+| V02 | Ausência de Hashing de Senha                   |       5       |    5    |      25       | **Crítico** |
+| V03 | Ausência de Proteção contra Força Bruta        |       4       |    4    |      16       | **Alto** |
+| V04 | Comparação Insegura (Timing Attack)            |       2       |    4    |       8       | **Médio** |
+
+**Legenda:**
+* **Probabilidade e Impacto:** Escala de 1 (Baixo) a 5 (Crítico).
+* **Risco:** Calculado como `Probabilidade x Impacto`.
+
+### CÓDIGO CORRIGIDO ABAIXO:
+
+import hashlib
+import os
+import hmac
+import re      
+
+def hash_password(password, salt=None):
+    """Gera um hash salgado para uma senha."""
+    if salt is None:
+        salt = os.urandom(16)
+    pwd_hash = hashlib.pbkdf2_hmac(
+        'sha256',
+        password.encode('utf-8'),
+        salt,
+        100000
+    )
+    return salt, pwd_hash
+
+def verify_password(stored_salt, stored_hash, provided_password):
+    """Verifica se a senha fornecida corresponde ao hash armazenado."""
+    _, pwd_hash = hash_password(provided_password, stored_salt)
+    return hmac.compare_digest(stored_hash, pwd_hash)
+
+def validar_forca_senha(senha):
+    """Verifica se uma senha atende aos critérios de segurança."""
+    if len(senha) < 8:
+        return "Erro: A senha deve ter no mínimo 8 caracteres."
+    if not re.search(r"[a-z]", senha):
+        return "Erro: A senha deve conter pelo menos uma letra minúscula."
+    if not re.search(r"[A-Z]", senha):
+        return "Erro: A senha deve conter pelo menos uma letra maiúscula."
+    if not re.search(r"\d", senha):
+        return "Erro: A senha deve conter pelo menos um número."
+    if not re.search(r"[@$!%*?&#]", senha):
+        return "Erro: A senha deve conter pelo menos um caractere especial (@, $, !, etc.)."
+    return True
+    
+def registrar_usuario(usuario, usuarios_db):
+    """Realiza o processo de registro de um novo usuário."""
+    if usuario in usuarios_db:
+        print("\n[!] Este nome de usuário já existe. Tente outro.")
+        return
+
+    while True:
+        # AVISO SOBRE A SENHA FICAR VISÍVEL
+        print("\n(AVISO: Em compiladores online, a senha pode ficar visível ao digitar.)")
+        senha = input(f"Crie uma senha para o usuário '{usuario}': ")
+        
+        validacao = validar_forca_senha(senha)
+        if validacao is not True:
+            print(f"\n[!] Senha fraca! {validacao}")
+            continue
+
+        confirmacao_senha = input("Confirme a senha: ")
+
+        if senha != confirmacao_senha:
+            print("\n[!] As senhas não coincidem. Tente novamente.")
+            continue
+        
+        salt, pwd_hash = hash_password(senha)
+        usuarios_db[usuario] = {"salt": salt, "hash": pwd_hash}
+        print(f"\n[✓] Usuário '{usuario}' registrado com sucesso!")
+        break
+
+def login_seguro(usuario, senha, usuarios_db):
+    """Função de login que utiliza o sistema de hash seguro."""
+    if usuario in usuarios_db:
+        user_data = usuarios_db[usuario]
+        if verify_password(user_data["salt"], user_data["hash"], senha):
+            return f"[✓] Login bem-sucedido! Bem-vindo, {usuario}!"
+    
+    return "[!] Usuário ou senha inválidos."
+
+if __name__ == "__main__":
+    # Nosso "banco de dados" em memória, que guarda os usuários.
+    usuarios_seguros = {}
+
+    while True:
+        print("\n" + "="*30)
+        print("    SISTEMA DE LOGIN SEGURO")
+        print("      (Compatível com Online)")
+        print("="*30)
+        print("1. Fazer Login")
+        print("2. Registrar Novo Usuário")
+        print("3. Sair")
+        print("="*30)
+        
+        opcao = input("Escolha uma opção: ")
+
+        if opcao == '1':
+            if not usuarios_seguros:
+                print("\n[!] Nenhum usuário cadastrado. Registre um usuário primeiro.")
+                continue
+            user = input("Usuário: ")
+            
+            # AVISO SOBRE A SENHA FICAR VISÍVEL
+            print("(AVISO: A senha pode ficar visível durante a digitação.)")
+            pwd = input("Senha: ")
+            print(login_seguro(user, pwd, usuarios_seguros))
+        
+        elif opcao == '2':
+            user = input("Digite o nome do novo usuário: ")
+            registrar_usuario(user, usuarios_seguros)
+
+        elif opcao == '3':
+            print("Saindo do sistema. Até logo!")
+            break
+        
+        else:
+            print("\n[!] Opção inválida. Por favor, escolha 1, 2 ou 3.")
+
+### QUESTÕES RESPONDIDAS
+
+1 - No código original, foram identificadas as seguintes vulnerabilidades críticas:
+
+As senhas estavam visíveis diretamente no código-fonte (ex: "admin": "123456"). Qualquer pessoa com acesso ao arquivo de código teria acesso a todas as senhas;
+As senhas não passavam por nenhum processo de criptografia. Elas eram armazenadas e comparadas como texto simples, o que é uma prática de segurança extremamente perigosa;
+O sistema não possuía nenhum mecanismo para limitar ou atrasar múltiplas tentativas de login, permitindo que um atacante testasse milhares de senhas por segundo sem ser bloqueado;
+O uso do operador == para comparar senhas poderia, em teoria, ser vulnerável a ataques de temporização (timing attacks), embora este seja um risco mais complexo de explorar.
+
+2 - A vulnerabilidade de Credenciais Armazenadas em Texto Claro / Ausência de Hashing apresentou, de longe, o maior risco.
+
+Probabilidade (P): Altíssima (5/5). Se o código-fonte vazar ou for acessado por uma pessoa não autorizada (um ex-funcionário, um atacante), a exploração é imediata.
+
+Impacto (I): Crítico (5/5). A exploração leva ao comprometimento instantâneo e total de todas as contas de usuário, incluindo as de administradores.
+
+O risco resultante (P x I = 25) é classificado como Crítico, pois representa uma falha fundamental na confidencialidade do sistema.
+
+3 - A exploração dessa falha em uma empresa teria consequências catastróficas. Um atacante poderia roubar dados sensíveis de clientes e da própria empresa, resultando em perdas financeiras diretas através de fraudes. Além do enorme dano à reputação da marca, a empresa enfrentaria pesadas multas por violar leis como a LGPD, e o sistema invadido ainda poderia servir de porta de entrada para ataques mais graves em sua rede interna.
+
+4 - As falhas foram corrigidas ao substituir o armazenamento de senhas em texto puro por um sistema seguro de hashing com salt, que converte cada senha em um código criptográfico único. Além disso, foi implementado um novo fluxo de registro que exige senhas fortes e utiliza um processo de verificação intencionalmente lento para dificultar ataques de força bruta.
+
+5 - As melhorias mais efetivas foram a eliminação do risco crítico de vazamento de senhas através do hashing e a adoção de uma segurança proativa, que agora impede a criação de senhas fracas. Além disso, o código ficou mais organizado e robusto, e o sistema passou a educar os usuários sobre boas práticas de segurança durante o uso.
